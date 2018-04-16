@@ -12,17 +12,16 @@ import {
   View
 } from 'react-native';
 
-import cubo from './cubo.json';
 import { Shaders, Node, GLSL } from "gl-react";
 import { Surface } from "gl-react-native";
 import { WebGLView } from "react-native-webgl";
 
-import {addDraw, createProgram} from './glsl_helpers';
+import {addDraw, createProgram,
+  rotateZ, rotateX, rotateY} from './glsl_helpers';
 
-import {rotateZ, rotateX, rotateY} from './rotation';
-import vertexCode from './vertexCode';
-import fragmentCode from './fragmentCode';
-//var vertCode = require('webpack-glsl!./vertex');
+import Cubo from './cubo';
+
+//import cuboInfo from './info.json';
 
 
 const instructions = Platform.select({
@@ -37,94 +36,97 @@ export default class App extends Component<Props> {
   onContextCreate = (gl) => {
     const rngl = gl.getExtension("RN");
 
-      var shaderProgram = createProgram(gl, vertexCode, fragmentCode);
+    const shaderProgram1 = createProgram(gl, Cubo.vertexCode, Cubo.fragmentCode);
+    let Pmatrix = gl.getUniformLocation(shaderProgram1, "Pmatrix");
+    let Vmatrix = gl.getUniformLocation(shaderProgram1, "Vmatrix");
+    let Mmatrix = gl.getUniformLocation(shaderProgram1, "Mmatrix");
 
-      addDraw(gl, cubo);
+    const cubos = [
+      addDraw(gl, shaderProgram1, Cubo.draw),
+      addDraw(gl, shaderProgram1, Cubo.draw)
+    ];
 
-       /*==================== MATRIX =====================*/
-
-       var canvas = {
-        width: PixelRatio.getPixelSizeForLayoutSize(300),
-        height: PixelRatio.getPixelSizeForLayoutSize(300)
+    /*==================== Projection =====================*/
+    var canvas = {
+      width: PixelRatio.getPixelSizeForLayoutSize(300),
+      height: PixelRatio.getPixelSizeForLayoutSize(300)
+    }
+    function get_projection(angle, a, zMin, zMax) {
+        var ang = Math.tan((angle*.5)*Math.PI/180);//angle*.5
+        return [
+            0.5/ang, 0 , 0, 0,
+            0, 0.5*a/ang, 0, 0,
+            0, 0, -(zMax+zMin)/(zMax-zMin), -1,
+            0, 0, (-2*zMax*zMin)/(zMax-zMin), 0
+        ];
       }
-      function get_projection(angle, a, zMin, zMax) {
-          var ang = Math.tan((angle*.5)*Math.PI/180);//angle*.5
-          return [
-             0.5/ang, 0 , 0, 0,
-             0, 0.5*a/ang, 0, 0,
-             0, 0, -(zMax+zMin)/(zMax-zMin), -1,
-             0, 0, (-2*zMax*zMin)/(zMax-zMin), 0 
-          ];
-       }
-    
-       var proj_matrix = get_projection(40, canvas.width/canvas.height, 1, 100);
 
-       var mov_matrix = [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1];
-       var view_matrix = [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1];
+    var proj_matrix = get_projection(40, canvas.width/canvas.height, 1, 100);
+    var view_matrix = [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1];
 
-       // translating z
-       view_matrix[14] = view_matrix[14]-3;//zoom
+    // translating z
+    view_matrix[14] = view_matrix[14]-10;//zoom
 
-       /*================= Drawing ===========================*/
-       var time_old = 0;
-    
-       var animate = function(time) {
+    /*================= Drawing ===========================*/
+    var time_old = 0;
 
-          var dt = time-time_old;
-          rotateZ(mov_matrix, dt*0.005);//time
-          rotateY(mov_matrix, dt*0.002);
-          rotateX(mov_matrix, dt*0.003);
-          time_old = time;
+    var animate = function(time) {
 
-          gl.enable(gl.DEPTH_TEST);
-          gl.depthFunc(gl.LEQUAL);
-          gl.clearColor(0.5, 0.5, 0.5, 0.9);
-          gl.clearDepth(1.0);
+      var dt = time-time_old;
+      time_old = time;
 
-          gl.viewport(0.0, 0.0, canvas.width, canvas.height);
-          gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-          gl.uniformMatrix4fv(Pmatrix, false, proj_matrix);
-          gl.uniformMatrix4fv(Vmatrix, false, view_matrix);
-          gl.uniformMatrix4fv(Mmatrix, false, mov_matrix);
-          gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cubo.buffers.indices);
-          gl.drawElements(gl.TRIANGLES, cubo.indices.data.length, gl.UNSIGNED_SHORT, 0);
-      
-          requestAnimationFrame(animate);
-          gl.flush();
-          rngl.endFrame();
-       }
+      gl.enable(gl.DEPTH_TEST);
+      gl.depthFunc(gl.LEQUAL);
+      gl.clearColor(0.5, 0.5, 0.5, 0.9);
+      gl.clearDepth(1.0);
 
-      /** Textures */
-      
-      const tLocation = gl.getUniformLocation(shaderProgram, "t");
-      rngl
-        .loadTexture({
-          image: "http://www8.oca.com.ar/SigmaWebApi/texture_cube.png",
-          yflip: false 
-        })
-        .then(({ texture }) => {
-          gl.activeTexture(gl.TEXTURE0);
-          gl.bindTexture(gl.TEXTURE_2D, texture);
-          gl.uniform1i(tLocation, 0);
-          animate(0);
-        });
- 
-        /* ====== Associating attributes to vertex shader =====*/
-        var Pmatrix = gl.getUniformLocation(shaderProgram, "Pmatrix");
-        var Vmatrix = gl.getUniformLocation(shaderProgram, "Vmatrix");
-        var Mmatrix = gl.getUniformLocation(shaderProgram, "Mmatrix");
- 
-        gl.bindBuffer(gl.ARRAY_BUFFER, cubo.buffers.vertices);
-        var position = gl.getAttribLocation(shaderProgram, "position");
-        gl.vertexAttribPointer(position, 3, gl.FLOAT, false,0,0) ;
-        gl.enableVertexAttribArray(position);
+      gl.viewport(0.0, 0.0, canvas.width, canvas.height);
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-        var a_uv = gl.getAttribLocation(shaderProgram, "a_uv");
-        gl.vertexAttribPointer(a_uv, 3, gl.FLOAT, false,0,0) ;
-        gl.enableVertexAttribArray(a_uv);
-        
-        gl.useProgram(shaderProgram);
- 
+      gl.uniformMatrix4fv(Pmatrix, false, proj_matrix);
+      gl.uniformMatrix4fv(Vmatrix, false, view_matrix);
+
+      // Cubo1
+			let model = cubos[0].model;
+			rotateY(model, dt*0.002);
+			rotateX(model, dt*0.002);
+			model[12] = -3;
+			model[13] = 3;
+      gl.uniformMatrix4fv(Mmatrix, false, model);
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cubos[0].buffers.indices);
+      gl.drawElements(gl.TRIANGLES, Cubo.draw.indices.data.length, gl.UNSIGNED_SHORT, 0);
+
+      // Cubo2
+			model = cubos[1].model;
+			rotateY(model, dt*0.002);
+			model[12] = 3;
+			gl.uniformMatrix4fv(Mmatrix, false, model);
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cubos[1].buffers.indices);
+      gl.drawElements(gl.TRIANGLES, Cubo.draw.indices.data.length, gl.UNSIGNED_SHORT, 0);
+
+      requestAnimationFrame(animate);
+      gl.flush();
+      rngl.endFrame();
+    }
+
+    /** Textures */
+
+    const tLocation = gl.getUniformLocation(shaderProgram1, "t");
+    rngl
+      .loadTexture({
+        image: "http://www8.oca.com.ar/SigmaWebApi/texture_cube.png",
+        yflip: false
+      })
+      .then(({ texture }) => {
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.uniform1i(tLocation, 0);
+        animate(0);
+      });
+
+    /* ====== Associating attributes to vertex shader =====*/
+    gl.useProgram(shaderProgram1);
+
   };
 
   render() {

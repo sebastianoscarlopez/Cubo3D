@@ -1,0 +1,32 @@
+{
+    "vertices": {
+        "type": "Float32Array",
+        "data" :[
+			-1,-1,-1, 1,-1,-1, 1,1,-1, -1,1,-1,
+			-1,-1, 1, 1,-1, 1, 1,1, 1, -1,1, 1
+        ],
+        "attribute": "position",
+        "dimension": 3
+    },
+    "indices": {
+        "type": "Uint16Array",
+        "data": [
+          1,0,3, 1,3,2,
+		  4,5,6, 4,6,7,
+		  0,4,7, 0,7,3,
+		  5,1,2, 5,2,6,
+		  7,6,2, 7,2,3,
+		  0,1,5, 0,5,7
+       ]
+    },
+	"texture": {
+        "type": "Float32Array",
+        "data": [
+			0, 0, 1, 0, 1, 1, 0, 1,
+			0, 0, 1, 0, 1, 1, 0, 1
+        ],
+        "attribute": "a_uv",
+        "dimension": 2,
+        "uniform": "uv"
+    }
+}
